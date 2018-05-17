@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.8)
-project(untitled)
+cmake_minimum_required(VERSION 3.5)
+project(Word2Vec)
 
 set(CMAKE_CXX_STANDARD 11)
 
 set(SOURCE_FILES main.cpp)
-add_executable(untitled ${SOURCE_FILES})
+add_executable(Word2Vec ${SOURCE_FILES})
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(untitled Threads::Threads)
+target_link_libraries(Word2Vec Threads::Threads)

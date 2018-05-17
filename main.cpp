@@ -83,8 +83,7 @@ public:
 
     int searchVocab(const string &word)
     {
-        if (vocab.find(getWordHash(word)) == vocab.end())
-        {
+        if (vocab.find(getWordHash(word)) == vocab.end()) {
             return -1;
         }
         return 1;
@@ -93,8 +92,7 @@ public:
     void readWordIndex(ifstream &in)
     {
         string word;
-        while (in >> word)
-        {
+        while (in >> word) {
             cout << word << endl;
         }
     }
@@ -105,8 +103,7 @@ public:
     void initializeVocab()
     {
         vector<string> s = {"I", "have", "an", "apple", "an", "I", "I"};
-        for (auto &i : s)
-        {
+        for (auto &i : s) {
             addWordToVocab(i);
         }
         cout << vocab.size() << endl;
@@ -116,25 +113,20 @@ public:
     void addWordToVocab(const string &word, long long increment = 1)
     {
         auto it = vocab.find(getWordHash(word));
-        if (it == vocab.end())
-        {
+        if (it == vocab.end()) {
             WordInVocab tmp;
             tmp.word = word;
             tmp.cnt = increment;
             vocab.insert(make_pair(getWordHash(word), tmp));
-        }
-        else
-        {
+        } else {
             it->second.cnt += increment;
         }
     }
 
     void reduceVocabSize()
     {
-        for (auto it = vocab.begin(); it != vocab.end(); it++)
-        {
-            if (it->second.cnt < minCount)
-            {
+        for (auto it = vocab.begin(); it != vocab.end(); it++) {
+            if (it->second.cnt < minCount) {
                 vocab.erase(it);
             }
         }
@@ -143,12 +135,10 @@ public:
     void createBinaryTree()
     {
         priority_queue<BinaryTreeNode *, vector<BinaryTreeNode *>, BinaryTreeNodeCompare> pq;
-        for (auto &it : vocab)
-        {
+        for (auto &it : vocab) {
             pq.push(new BinaryTreeNode(it.second.cnt, it.first, ""));
         }
-        while (pq.size() > 1)
-        {
+        while (pq.size() > 1) {
 
             auto left = pq.top();
             pq.pop();
@@ -168,31 +158,21 @@ public:
     {
         point.push_back(n);
 
-        if (n->left != nullptr)
-        {
+        if (n->left != nullptr) {
             n->left->code = n->code + "0";
             createHuffmanCode(n->left, point);
         }
-        if (n->right != nullptr)
-        {
+        if (n->right != nullptr) {
             n->right->code = n->code + "1";
             createHuffmanCode(n->right, point);
         }
-        if (n->id != -1)
-        {
+        if (n->id != -1) {
             auto it = vocab.find(n->id);
-            cout << n->code << endl;
             it->second.code = n->code;
             it->second.point = point;
             it->second.currentNode = n;
-            for (auto node : point)
-            {
-                cout << node << " ";
-            }
             cout << it->second.word << " " << n->code << endl;
-        }
-        else
-        {
+        } else {
             midNodeList.push_back(n);
         }
     }
@@ -202,8 +182,7 @@ public:
         ifstream inFile;
         inFile.open(trainFileName, std::ifstream::in);
         string word;
-        while (inFile >> word)
-        {
+        while (inFile >> word) {
             addWordToVocab(word);
         }
     }
@@ -212,8 +191,7 @@ public:
     {
         std::ofstream ofs;
         ofs.open("vocab", std::ofstream::out);
-        for (auto &it : vocab)
-        {
+        for (auto &it : vocab) {
             ofs << it.second.word << " " << it.second.cnt << endl;
         }
     }
@@ -235,8 +213,7 @@ public:
         ifs.open("vocab", ifstream::in);
         for (string word, cntStr;
              getline(ifs, word, ' ') && getline(ifs, cntStr);
-                )
-        {
+                ) {
             long long cnt = stoll(cntStr);
             addWordToVocab(word, cnt);
         }
@@ -244,8 +221,7 @@ public:
 
     void printMidNodeList()
     {
-        for (auto it : midNodeList)
-        {
+        for (auto it : midNodeList) {
             cout << it << endl;
 
         }
@@ -259,8 +235,7 @@ public:
     unordered_map<long long, vector<double>> getMidNodeMatrix(long long size)
     {
         unordered_map<long long, vector<double>> mat;
-        for (auto node:midNodeList)
-        {
+        for (auto node:midNodeList) {
             mat.insert(make_pair((long long) node, vector<double>(static_cast<unsigned long>(size), 0)));
         }
         return mat;
@@ -307,10 +282,8 @@ public:
         vocab.learnFromTrainFile();
         vocab.createBinaryTree();
         negative = 1;
-        for (int i = 0; i < EXP_TABLE_SIZE; i++)
-        {
-            expTable.push_back(0);
-            expTable[i] = exp((i / (double) EXP_TABLE_SIZE * 2 - 1) * MAX_EXP); // Precompute the exp() table
+        for (int i = 0; i < EXP_TABLE_SIZE; i++) {
+            expTable.push_back(exp((i / (double) EXP_TABLE_SIZE * 2 - 1) * MAX_EXP)); // Precompute the exp() table
             expTable[i] = expTable[i] / (expTable[i] + 1);                   // Precompute f(x) = x / (x + 1)
         }
     }
@@ -321,8 +294,7 @@ public:
         int a, i;
         double train_words_pow = 0;
         double d1, power = 0.75;
-        for (auto &it : vocab.vocab)
-        {
+        for (auto &it : vocab.vocab) {
             train_words_pow += pow(it.second.cnt, power);
         }
 
@@ -330,46 +302,33 @@ public:
         auto prevIt = vocab.vocab.begin();
         d1 = pow(it->second.cnt, power) / train_words_pow;
 
-        for (a = 0; a < table_size; a++)
-        {
+        for (a = 0; a < table_size; a++) {
             table.push_back(it);
-            if (a / (double) table_size > d1)
-            {
+            if (a / (double) table_size > d1) {
                 prevIt = it++;
                 d1 += pow(it->second.cnt, power) / train_words_pow;
             }
-            if (it == vocab.vocab.end())
-            { it = prevIt; }
+            if (it == vocab.vocab.end()) { it = prevIt; }
         }
     }
 
 public:
     void initNet()
     {
-        unsigned long long next_random = 1;
+        default_random_engine defaultRandomEngine;
         int vocab_size = vocab.getVocabSize();
-        if (hs)
-        {
+        if (hs) {
 //            syn1.resize(0);
 //            syn1.resize(static_cast<unsigned long>(vocab_size * layer1Size), 0);
             syn1New = vocab.getMidNodeMatrix(layer1Size);
         }
-        for (auto n:vocab.vocab)
-        {
-            vector<double> tmp;
-            random_device rd;
-            mt19937 mt(rd());
-            uniform_real_distribution<double> dist(-0.5, 0.5);
-            for (long long b = 0; b < layer1Size; b++)
-            {
-
-                tmp.push_back(dist(mt));
-                cout << "Random number " << b << " : " << tmp.back() << endl;
-            }
+        uniform_real_distribution<double> dist(-0.5, 0.5);
+        for (auto n:vocab.vocab) {
+            vector<double> tmp(static_cast<unsigned long>(layer1Size));
+            std::generate(tmp.begin(), tmp.end(), std::bind(dist, std::ref(defaultRandomEngine)));
             syn0New.insert(make_pair((long long) n.second.currentNode, tmp));
         }
-        if (negative > 0)
-        {
+        if (negative > 0) {
 //            syn1neg.resize(0);
 //            syn1neg.resize(static_cast<unsigned long>(vocab_size * layer1Size), 0);
             syn1negNew = syn0New;
@@ -386,7 +345,7 @@ public:
         cout << syn1negNew.size() << endl;
     }
 
-    unordered_map<long long, vector<double>>::iterator getVector(const string &word)
+    const unordered_map<long long, vector<double>>::iterator getVector(const string &word)
     {
         cout << "Find vector representation of " << word << endl;
         auto iter = vocab.vocab.find(getWordHash(word));
@@ -395,12 +354,13 @@ public:
     }
 };
 
-void trainModelThread(Word2Vec &w2v, int id)
+void trainModelThread(Word2Vec &w2v, int threadId)
 {
     vector<double> neu1(static_cast<unsigned long>(w2v.layer1Size));
     vector<double> neu1e(static_cast<unsigned long>(w2v.layer1Size));
     ifstream inFile(w2v.trainFile, ifstream::binary);
-    inFile.seekg(w2v.trainFileSize / (long long) w2v.numThreads * (long long) id);
+    inFile.seekg(w2v.trainFileSize / (long long) w2v.numThreads * (long long) threadId);
+    default_random_engine defaultRandomEngine;
 
     long long wordCount = 0, lastWordCount = 0;
 
@@ -411,16 +371,13 @@ void trainModelThread(Word2Vec &w2v, int id)
 
     long long localIter = w2v.iter;
 
-    while (true)
-    {
-        cout << "wordCount: " << wordCount << endl;
-        cout << "lastWordCount: " << lastWordCount << endl;
-        if (wordCount - lastWordCount > 10000)
-        {
+    while (true) {
+//        cout << "wordCount: " << wordCount << endl;
+//        cout << "lastWordCount: " << lastWordCount << endl;
+        if (wordCount - lastWordCount > 10000) {
             w2v.wordCountActual += wordCount - lastWordCount;
             lastWordCount = wordCount;
-            if ((w2v.debugMode > 1))
-            {
+            if ((w2v.debugMode > 1)) {
                 clock_t now = clock();
                 printf("%cAlpha: %f  Progress: %.2f%%  Words/thread/sec: %.2fk  ", 13, w2v.alpha,
                        w2v.wordCountActual / (double) (w2v.iter * w2v.train_words + 1) * 100,
@@ -429,22 +386,19 @@ void trainModelThread(Word2Vec &w2v, int id)
             }
             // Slightly decreases alpha.
             w2v.alpha = w2v.starting_alpha * (1 - w2v.wordCountActual / (double) (w2v.iter * w2v.train_words + 1));
-            if (w2v.alpha < w2v.starting_alpha * 0.0001)
-            {
+            if (w2v.alpha < w2v.starting_alpha * 0.0001) {
                 w2v.alpha = w2v.starting_alpha * 0.0001;
             }
         }
         // Build a sentence of word
-        if (sentence.empty())
-        {
+        if (sentence.empty()) {
             string line;
             getline(inFile, line);
             std::stringstream ss(line);
             std::istream_iterator<std::string> begin(ss);
             std::istream_iterator<std::string> end;
             std::vector<std::string> senStringVec(begin, end);
-            for (const auto &word:senStringVec)
-            {
+            for (const auto &word:senStringVec) {
                 sentence.push_back(w2v.vocab.getVocabIter(word));
             }
 
@@ -454,199 +408,147 @@ void trainModelThread(Word2Vec &w2v, int id)
         }
 
 
-        if (inFile.eof() || (wordCount > w2v.train_words / w2v.numThreads))
-        {
+        if (inFile.eof() || (wordCount > w2v.train_words / w2v.numThreads)) {
             w2v.wordCountActual += wordCount - lastWordCount;
             localIter--;
-            cout << "Local Iterator: " << localIter << endl;
-            if (localIter == 0)
-            { break; }
+//            cout << "Local Iterator: " << localIter << endl;
+            if (localIter == 0) { break; }
             wordCount = 0;
             lastWordCount = 0;
-            inFile.seekg(w2v.trainFileSize / (long long) w2v.numThreads * (long long) id);
+            inFile.seekg(w2v.trainFileSize / (long long) w2v.numThreads * (long long) threadId);
         }
 
         auto word = sentence[sentencePosition];
-        if (word == w2v.vocab.getVocabEndIter())
-        { continue; }
+        if (word == w2v.vocab.getVocabEndIter()) { continue; }
 
         fill(neu1.begin(), neu1.end(), 0);
         fill(neu1e.begin(), neu1e.end(), 0);
-        random_device rd;
-        mt19937 mt(rd());
-        uniform_int_distribution<int> dist(1, w2v.window - 1);
-        int realWindowSize = dist(mt);
+        uniform_int_distribution<> dist(1, w2v.window - 1);
+        int realWindowSize = dist(defaultRandomEngine);
 
-        if (w2v.cbow)
-        {
+        if (w2v.cbow) {
             long long cw = 0;
             // Calculate the window of central word
-            for (long long i = realWindowSize; i < w2v.window * 2 + 1 - realWindowSize; i++)
-            {
-                if (i != w2v.window)
-                {
+            for (long long i = realWindowSize; i < w2v.window * 2 + 1 - realWindowSize; i++) {
+                if (i != w2v.window) {
                     // TODO Check available of unmatched type for window and sentencePosition
                     long long j = sentencePosition - w2v.window + i;
-                    if (j < 0 || j >= sentence.size())
-                    { continue; }
+                    if (j < 0 || j >= sentence.size()) { continue; }
                     lastWord = sentence[j];
-                    if (lastWord == w2v.vocab.getVocabEndIter())
-                    { continue; }
+                    if (lastWord == w2v.vocab.getVocabEndIter()) { continue; }
                     l1 = (long long) lastWord->second.currentNode;
 
                     // Calculate sum of word vector in window
 //                        for (long long k = 0; k < layer1Size; k++) neu1[k] += syn0[k + index * layer1Size];
-                    for (long long k = 0; k < w2v.layer1Size; k++)
-                    { neu1[k] += w2v.syn0New[l1][k]; }
+                    for (long long k = 0; k < w2v.layer1Size; k++) { neu1[k] += w2v.syn0New[l1][k]; }
                     cw++;
                 }
             }
 
-            if (cw)
-            {
-                for (long long i = 0; i < w2v.layer1Size; i++)
-                {
+            if (cw) {
+                for (long long i = 0; i < w2v.layer1Size; i++) {
                     neu1[i] /= cw;
                 }
 
                 //如果采用分层softmax优化
                 //根据Huffman树上从根节点到当前词的叶节点的路径，遍历所有经过的中间节点
-                if (w2v.hs)
-                {
-                    for (size_t i = 0; i < word->second.code.size(); i++)
-                    {
+                if (w2v.hs) {
+                    for (size_t i = 0; i < word->second.code.size(); i++) {
                         double f = 0;
                         l2 = (long long) word->second.point[i];
-                        for (int j = 0; j < w2v.layer1Size; j++)
-                        {
+                        for (int j = 0; j < w2v.layer1Size; j++) {
                             f += w2v.syn1New[l2][j] * neu1[j];
                         }
                         //检测f有没有超出Sigmoid函数表的范围
-                        if (f <= -w2v.MAX_EXP)
-                        { continue; }
-                        else if (f >= w2v.MAX_EXP)
-                        {
+                        if (f <= -w2v.MAX_EXP) { continue; }
+                        else if (f >= w2v.MAX_EXP) {
                             continue;
                             //如果没有超出范围则对f进行Sigmoid变换
-                        }
-                        else
-                        { f = w2v.expTable[(int) ((f + w2v.MAX_EXP) * (w2v.EXP_TABLE_SIZE / w2v.MAX_EXP / 2))]; }
+                        } else { f = w2v.expTable[(int) ((f + w2v.MAX_EXP) * (w2v.EXP_TABLE_SIZE / w2v.MAX_EXP / 2))]; }
 
                         double g = (1 - word->second.code[i] - f) * w2v.alpha;
-                        for (int j = 0; j < w2v.layer1Size; j++)
-                        {
+                        for (int j = 0; j < w2v.layer1Size; j++) {
                             neu1e[j] += g * w2v.syn1New[l2][j];
                         }
-                        for (int j = 0; j < w2v.layer1Size; j++)
-                        {
+                        for (int j = 0; j < w2v.layer1Size; j++) {
                             w2v.syn1New[l2][j] += g * neu1[j];
                         }
                     }
                 }
 
-                if (w2v.negative > 0)
-                {
+                if (w2v.negative > 0) {
                     uniform_int_distribution<unsigned long> dist2(0, w2v.table.size() - 1);
-                    for (int i = 0; i < w2v.negative + 1; i++)
-                    {
+                    for (int i = 0; i < w2v.negative + 1; i++) {
                         unordered_map<size_t, WordInVocab>::iterator target;
                         long long label;
 
-                        if (i == 0)
-                        {
+                        if (i == 0) {
                             target = word;
                             label = 1;
-                        }
-                        else
-                        {
-                            auto nextRandom = dist2(mt);
-                            target = w2v.table[nextRandom];
-                            if (target == word)
-                            { continue; }
+                        } else {
+                            target = w2v.table[dist2(defaultRandomEngine)];
+                            if (target == word) { continue; }
                             label = 0;
                         }
 
                         l2 = (long long) target->second.currentNode;
                         double f = 0;
-                        for (int j = 0; j < w2v.layer1Size; j++)
-                        {
+                        for (int j = 0; j < w2v.layer1Size; j++) {
                             f += neu1[j] * w2v.syn1negNew[l2][j];
                         }
                         double g;
 
-                        if (f > w2v.MAX_EXP)
-                        { g = (label - 1) * w2v.alpha; }
-                        else if (f < -w2v.MAX_EXP)
-                        {
+                        if (f > w2v.MAX_EXP) { g = (label - 1) * w2v.alpha; }
+                        else if (f < -w2v.MAX_EXP) {
                             g = (label - 0) * w2v.alpha;
                             //g = (label - f)*alpha
-                        }
-                        else
-                        {
+                        } else {
                             g = (label -
                                  w2v.expTable[(int) ((f + w2v.MAX_EXP) * (w2v.EXP_TABLE_SIZE / w2v.MAX_EXP / 2))]) *
                                 w2v.alpha;
                         }
                         //用辅助向量和g更新累计误差
-                        for (int j = 0; j < w2v.layer1Size; j++)
-                        { neu1e[j] += g * w2v.syn1negNew[l2][j]; }
+                        for (int j = 0; j < w2v.layer1Size; j++) { neu1e[j] += g * w2v.syn1negNew[l2][j]; }
                         //用输入向量和g更新辅助向量
-                        for (int j = 0; j < w2v.layer1Size; j++)
-                        { w2v.syn1negNew[l2][j] += g * neu1[j]; }
+                        for (int j = 0; j < w2v.layer1Size; j++) { w2v.syn1negNew[l2][j] += g * neu1[j]; }
 
                     }
 
-                    for (long long a = realWindowSize; a < w2v.window * 2 + 1 - realWindowSize; a++)
-                    {
-                        if (a != w2v.window)
-                        {
+                    for (long long a = realWindowSize; a < w2v.window * 2 + 1 - realWindowSize; a++) {
+                        if (a != w2v.window) {
                             long long c = sentencePosition - w2v.window + a;
-                            if (c < 0)
-                            { continue; }
-                            if (c >= sentence.size())
-                            { continue; }
+                            if (c < 0) { continue; }
+                            if (c >= sentence.size()) { continue; }
                             lastWord = sentence[c];
-                            if (lastWord == w2v.vocab.getVocabEndIter())
-                            { continue; }
+                            if (lastWord == w2v.vocab.getVocabEndIter()) { continue; }
 
                             auto l = (long long) lastWord->second.currentNode;
 
-                            for (c = 0; c < w2v.layer1Size; c++)
-                            { w2v.syn0New[l][c] += neu1e[c]; }
+                            for (c = 0; c < w2v.layer1Size; c++) { w2v.syn0New[l][c] += neu1e[c]; }
                         }
                     }
-
-
                 }
-
-
             }
-
-
         }
         sentencePosition++;
         //处理完一句句子后，将句子长度置为零，进入循环，重新读取句子并进行逐词计算
-        if (sentencePosition >= sentence.size())
-        {
+        if (sentencePosition >= sentence.size()) {
             sentencePosition = 0;
             sentence.erase(sentence.begin(), sentence.end());
             continue;
         }
-
-
     }
-
-
 }
 
 vector<double> getDifference(const vector<double> &v1, const vector<double> &v2)
 {
+//    for(const auto& i: v1) cout<<i<<" ";
+//    cout<<endl;
     assert(v1.size() == v2.size());
     vector<double> c;
     auto v1Iter = v1.begin();
     auto v2Iter = v2.begin();
-    while (v1Iter != v1.end())
-    {
+    while (v1Iter != v1.end()) {
         c.push_back(*v1Iter - *v2Iter);
         v1Iter++;
         v2Iter++;
@@ -659,22 +561,23 @@ double getDotProduct(const vector<double> &v1, const vector<double> &v2)
 {
     assert(v1.size() == v2.size());
     double c = 0;
+    double vc1 = 0, vc2 = 0;
 
     auto v1Iter = v1.begin();
     auto v2Iter = v2.begin();
-    while (v1Iter != v1.end())
-    {
+    while (v1Iter != v1.end()) {
         c += (*v1Iter * *v2Iter);
+        vc1 += (*v1Iter * *v1Iter);
+        vc2 += (*v2Iter * *v2Iter);
         v1Iter++;
         v2Iter++;
     }
-    return c;
+    return c / (sqrt(vc1) * sqrt(vc2));
 }
 
 void printVector(const vector<double> &v)
 {
-    for (auto it:v)
-    { cout << it << " "; }
+    for (auto it:v) { cout << it << " "; }
     cout << endl;
 
 }
@@ -686,8 +589,7 @@ void trainModel(Word2Vec &w2v)
 
     w2v.initNet();
 
-    if (w2v.negative > 0)
-    { w2v.initUnigramTable(); }
+    if (w2v.negative > 0) { w2v.initUnigramTable(); }
     w2v.start = clock();
 
     vector<thread> threadPool;
@@ -703,19 +605,16 @@ void trainModel(Word2Vec &w2v)
 //}
 
     trainModelThread(w2v, 0);
-    cout << "Hello world" << endl;
+    cout << "Train finished" << endl;
 
     ofstream outFile;
     outFile.open("result", std::ofstream::out);
-    if (w2v.classes == 0)
-    {
+    if (w2v.classes == 0) {
         outFile << w2v.vocab.getVocabSize() << "\t" << w2v.layer1Size << endl;
-        for (auto it:w2v.vocab.vocab)
-        {
+        for (auto it:w2v.vocab.vocab) {
             outFile << it.second.word << "\t";
             auto index = (long long) it.second.currentNode;
-            for (int j = 0; j < w2v.layer1Size; j++)
-            {
+            for (int j = 0; j < w2v.layer1Size; j++) {
                 outFile << w2v.syn0New[index][j] << " ";
             }
             outFile << endl;
@@ -723,7 +622,7 @@ void trainModel(Word2Vec &w2v)
         outFile << endl;
     }
 
-    vector<string> stringList = {"Paris", "Beijing", "China", "French"};
+    vector<string> stringList = {"Beijing", "Paris", "French", "China"};
     auto iter = w2v.getVector(stringList[0]);
 //    cout<< (iter == w2v.syn0New.end())<<endl;
 //    printVector(iter->second);
