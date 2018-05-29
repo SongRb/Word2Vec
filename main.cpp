@@ -26,10 +26,10 @@ struct BinaryTreeNode
     BinaryTreeNode *left = nullptr;
     BinaryTreeNode *right = nullptr;
     long long weight;
-    size_t id;
+    long long id;
     string code;
 
-    BinaryTreeNode(long long w, size_t i, string c) : weight(w), id(i), code(std::move(c))
+    BinaryTreeNode(long long w, long long i, string c) : weight(w), id(i), code(std::move(c))
     {
     }
 
@@ -38,18 +38,10 @@ struct BinaryTreeNode
         left = ln;
         right = rn;
         weight = ln->weight + rn->weight;
-        id = static_cast<size_t>(-1);
+        id = static_cast<long long>(-1);
     }
 };
 
-class BinaryTreeNodeCompare
-{
-public:
-    bool operator()(BinaryTreeNode *lt, BinaryTreeNode *rt)
-    {
-        return lt->weight > rt->weight;
-    }
-};
 
 class Vocabulary
 {
@@ -138,7 +130,8 @@ public:
 
     void createBinaryTree()
     {
-        priority_queue<BinaryTreeNode *, vector<BinaryTreeNode *>, BinaryTreeNodeCompare> pq;
+        auto comp = []( BinaryTreeNode * lhs, BinaryTreeNode * rhs ) { return lhs->weight > rhs->weight; };
+        priority_queue<BinaryTreeNode*, vector<BinaryTreeNode *>, decltype(comp)> pq(comp);
         for (auto &it : wordTable)
         {
             pq.push(new BinaryTreeNode(it.second.cnt, it.first, ""));
@@ -156,6 +149,12 @@ public:
         cout << root->weight << endl;
         vector<BinaryTreeNode *> point;
         createHuffmanCode(root, point);
+        long long length = static_cast<long long>(midNodeList.size());
+        for(long long i=0;i<length;i++)
+        {
+            midNodeList[i]->id = static_cast<long long>(i);
+        }
+
     }
 
     void createHuffmanCode(BinaryTreeNode *n, vector<BinaryTreeNode *> point)
@@ -178,7 +177,6 @@ public:
             it->second.code = n->code;
             it->second.point = point;
             it->second.currentNode = n;
-//            cout << it->second.word << " " << n->code << endl;
         } else
         {
             midNodeList.push_back(n);
@@ -276,9 +274,9 @@ public:
     const int EXP_TABLE_SIZE = 1000;
     const int MAX_EXP = 6;
 
-    unordered_map<long long, vector<double>> vectorTable; ///< Original vector table index by word huffman code
-    unordered_map<long long, vector<double>> syn1New; ///< Parameter from hidden state to node
-    unordered_map<long long, vector<double>> syn1negNew;
+    unordered_map<long long, vector<double>> syn0; ///< Original vector table index by word huffman code
+    unordered_map<long long, vector<double>> syn1; ///< Parameter from hidden state to node
+    unordered_map<long long, vector<double>> syn1neg;
 
     double alpha = 0.025, starting_alpha, sample = 1e-3;
 
@@ -288,7 +286,7 @@ public:
     /// Negative sampling
     int ns = 5;
 
-    int debugMode = 1;
+    int debugMode = 2;
 
     clock_t start;
 public:
@@ -302,6 +300,7 @@ public:
             expTable.push_back(exp((i / (double) EXP_TABLE_SIZE * 2 - 1) * MAX_EXP)); // Precompute the exp() table
             expTable[i] = expTable[i] / (expTable[i] + 1);                   // Precompute f(x) = x / (x + 1)
         }
+        initNet();
     }
 
     // Requires test
@@ -339,34 +338,24 @@ public:
         int vocab_size = vocab.getVocabSize();
         if (hs)
         {
-//            syn1.resize(0);
-//            syn1.resize(static_cast<unsigned long>(vocab_size * layer1Size), 0);
-            syn1New = vocab.getMidNodeMatrix(layer1Size);
+            syn1 = vocab.getMidNodeMatrix(layer1Size);
         }
         uniform_real_distribution<double> dist(-0.5, 0.5);
         for (auto n:vocab.wordTable)
         {
             vector<double> tmp(static_cast<unsigned long>(layer1Size));
             std::generate(tmp.begin(), tmp.end(), std::bind(dist, std::ref(defaultRandomEngine)));
-            vectorTable.insert(make_pair((long long) n.second.currentNode, tmp));
+            syn0.insert(make_pair((long long) n.second.currentNode, tmp));
         }
         if (ns > 0)
         {
-
-//            syn1neg.resize(0);
-//            syn1neg.resize(static_cast<unsigned long>(vocab_size * layer1Size), 0);
-            syn1negNew = vectorTable;
+            for (auto n:vocab.wordTable)
+            {
+                vector<double> tmp(static_cast<unsigned long>(layer1Size));
+                std::generate(tmp.begin(), tmp.end(), std::bind(dist, std::ref(defaultRandomEngine)));
+                syn1neg.insert(make_pair((long long) n.second.currentNode, tmp));
+            }
         }
-
-//        for (long long a = 0; a < vocab_size; a++)
-//            for (long long b = 0; b < layer1Size; b++)
-//            {
-//                next_random = next_random * (unsigned long long) 25214903917 + 11;
-//                syn0[a * layer1Size + b] = (((next_random & 0xFFFF) / (double) 65536) - 0.5) / layer1Size;
-//            }
-
-
-        cout << syn1negNew.size() << endl;
     }
 
     const unordered_map<long long, vector<double>>::iterator getVector(const string &word)
@@ -374,7 +363,7 @@ public:
         cout << "Find vector representation of " << word << endl;
         auto iter = vocab.wordTable.find(getWordHash(word));
         cout << iter->second.word << endl;
-        return vectorTable.find((long long) iter->second.currentNode);
+        return syn0.find((long long) iter->second.currentNode);
     }
 
     int getVocabSize()
@@ -383,7 +372,27 @@ public:
     unordered_map<size_t, Vocabulary::Word>::iterator getVocabIter(const string &word)
     {
         return vocab.wordTable.find(getWordHash(word));
-    };
+    }
+
+    void decreaseAlpha()
+    {
+        alpha =
+            starting_alpha * (1 - wordCountActual / (double) (iterTimes * totalWordCount + 1));
+        if (alpha < starting_alpha * 0.0001)
+        {
+            alpha = starting_alpha * 0.0001;
+        }
+    }
+
+    void printProgress()
+    {
+        clock_t now = clock();
+        printf("%cAlpha: %f  Progress: %.2f%%  Words/thread/sec: %.2fk  ", 13, alpha,
+               wordCountActual / (double) (iterTimes * totalWordCount + 1) * 100,
+               wordCountActual / ((double) (now - start + 1) / (double) CLOCKS_PER_SEC * 1000));
+        fflush(stdout);
+    }
+
 };
 
 void verifyResult(Word2Vec &w2v);
@@ -431,21 +440,12 @@ void trainModelThread(Word2Vec &w2v, int threadId)
         {
             w2v.wordCountActual += wordCount - lastWordCount;
             lastWordCount = wordCount;
-            if ((w2v.debugMode > 1))
+            if (w2v.debugMode > 0)
             {
-                clock_t now = clock();
-                printf("%cAlpha: %f  Progress: %.2f%%  Words/thread/sec: %.2fk  ", 13, w2v.alpha,
-                       w2v.wordCountActual / (double) (w2v.iterTimes * w2v.totalWordCount + 1) * 100,
-                       w2v.wordCountActual / ((double) (now - w2v.start + 1) / (double) CLOCKS_PER_SEC * 1000));
-                fflush(stdout);
+                w2v.printProgress();
             }
             // Slightly decreases alpha.
-            w2v.alpha =
-                w2v.starting_alpha * (1 - w2v.wordCountActual / (double) (w2v.iterTimes * w2v.totalWordCount + 1));
-            if (w2v.alpha < w2v.starting_alpha * 0.0001)
-            {
-                w2v.alpha = w2v.starting_alpha * 0.0001;
-            }
+            w2v.decreaseAlpha();
         }
         // Build a sentence
         if (sentence.empty())
@@ -499,7 +499,7 @@ void trainModelThread(Word2Vec &w2v, int threadId)
 
                     // Calculate sum of word vector in window
                     for (long long k = 0; k < w2v.layer1Size; k++)
-                    { neu1[k] += w2v.vectorTable[index][k]; }
+                    { neu1[k] += w2v.syn0[index][k]; }
                     localWordCount++;
                 }
             }
@@ -510,8 +510,6 @@ void trainModelThread(Word2Vec &w2v, int threadId)
                 {
                     neu1[i] /= localWordCount;
                 }
-                //如果采用分层softmax优化
-                //根据Huffman树上从根节点到当前词的叶节点的路径，遍历所有经过的中间节点
                 if (w2v.hs)
                 {
                     hierarchicalSoftmax(w2v, neu1, neu1e, word);
@@ -534,6 +532,8 @@ void trainModelThread(Word2Vec &w2v, int threadId)
         }
     }
 }
+///      如果采用分层softmax优化
+//       根据Huffman树上从根节点到当前词的叶节点的路径，遍历所有经过的中间节点
 void hierarchicalSoftmax(Word2Vec &w2v, const vector<double> &neu1, vector<double> &neu1e,
                          const unordered_map<size_t, Vocabulary::Word>::iterator &word)
 {
@@ -543,7 +543,7 @@ void hierarchicalSoftmax(Word2Vec &w2v, const vector<double> &neu1, vector<doubl
         double f = 0;
         auto index = (long long) word->second.point[i];
         for (int j = 0; j < w2v.layer1Size; j++)
-        { f += w2v.syn1New[index][j] * neu1[j]; }
+        { f += w2v.syn1[index][j] * neu1[j]; }
         if (f <= -w2v.MAX_EXP or f >= w2v.MAX_EXP)
         { continue; }
         else
@@ -552,10 +552,10 @@ void hierarchicalSoftmax(Word2Vec &w2v, const vector<double> &neu1, vector<doubl
         double g = (1 - word->second.code[i] - f) * w2v.alpha; ///< gradient*learning rate
         // Propagate errors output -> hidden
         for (int j = 0; j < w2v.layer1Size; j++)
-        { neu1e[j] += g * w2v.syn1New[index][j]; }
+        { neu1e[j] += g * w2v.syn1[index][j]; }
         // Learn weights hidden -> output
         for (int j = 0; j < w2v.layer1Size; j++)
-        { w2v.syn1New[index][j] += g * neu1[j]; }
+        { w2v.syn1[index][j] += g * neu1[j]; }
     }
 }
 void negativeSampling(Word2Vec &w2v,
@@ -591,7 +591,7 @@ void negativeSampling(Word2Vec &w2v,
         auto index = (long long) target->second.currentNode;
         double f = 0;
         for (int j = 0; j < w2v.layer1Size; j++)
-        { f += neu1[j] * w2v.syn1negNew[index][j]; }
+        { f += neu1[j] * w2v.syn1neg[index][j]; }
         double g;
 
         if (f > w2v.MAX_EXP)
@@ -606,13 +606,13 @@ void negativeSampling(Word2Vec &w2v,
         }
         // Propagate errors output -> hidden
         for (int j = 0; j < w2v.layer1Size; j++)
-        { neu1e[j] += g * w2v.syn1negNew[index][j]; }
+        { neu1e[j] += g * w2v.syn1neg[index][j]; }
         // Learn weights hidden -> output
         for (int j = 0; j < w2v.layer1Size; j++)
-        { w2v.syn1negNew[index][j] += g * neu1[j]; }
+        { w2v.syn1neg[index][j] += g * neu1[j]; }
 
     }
-// BP from hidden layer to word2vec layer
+    // BP from hidden layer to word2vec layer
     for (long long a = realWindowSize; a < w2v.window * 2 + 1 - realWindowSize; a++)
     {
         if (a != w2v.window)
@@ -629,7 +629,7 @@ void negativeSampling(Word2Vec &w2v,
             auto l = (long long) lastWord->second.currentNode;
 
             for (c = 0; c < w2v.layer1Size; c++)
-            { w2v.vectorTable[l][c] += neu1e[c]; }
+            { w2v.syn0[l][c] += neu1e[c]; }
         }
     }
 }
@@ -652,8 +652,6 @@ void buildSentence(Word2Vec &w2v,
 
 vector<double> getDifference(const vector<double> &v1, const vector<double> &v2)
 {
-//    for(const auto& i: v1) cout<<i<<" ";
-//    cout<<endl;
     assert(v1.size() == v2.size());
     vector<double> c;
     auto v1Iter = v1.begin();
@@ -716,7 +714,6 @@ void trainModel(Word2Vec &w2v)
         threadPool[i].join();
     }
 
-//    trainModelThread(w2v, 0);
     cout << "Train finished" << endl;
 
     ofstream outFile;
@@ -730,15 +727,12 @@ void trainModel(Word2Vec &w2v)
             auto index = (long long) it.second.currentNode;
             for (int j = 0; j < w2v.layer1Size; j++)
             {
-                outFile << w2v.vectorTable[index][j] << " ";
+                outFile << w2v.syn0[index][j] << " ";
             }
             outFile << endl;
         }
         outFile << endl;
     }
-
-    verifyResult(w2v);
-
 }
 void verifyResult(Word2Vec &w2v)
 {
@@ -750,11 +744,23 @@ void verifyResult(Word2Vec &w2v)
     cout << "Product: " << getDotProduct(diff1, diff2) << endl;
 }
 
+void findSimiliarWord(Word2Vec &w2v, string word)
+{
+    for(const auto& candidate:w2v.syn0)
+    {
+
+    }
+}
+
+
+
 int main()
 {
-    Word2Vec word2Vec("test1");
-    word2Vec.initNet();
+    Word2Vec word2Vec("test");
+    word2Vec.debugMode=0;
+    word2Vec.numThreads = 4;
     trainModel(word2Vec);
+    verifyResult(word2Vec);
 //    const int EXP_TABLE_SIZE=1000;
 //    vector<double>expTable;
 //    const int MAX_EXP = 6;
