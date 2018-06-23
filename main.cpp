@@ -15,6 +15,7 @@
 
 using namespace std;
 
+/// Used to get word hash as id, deparated!!!
 size_t getWordHash(const string &word)
 {
     hash<string> str_hash;
@@ -26,10 +27,11 @@ struct BinaryTreeNode
     BinaryTreeNode *left = nullptr;
     BinaryTreeNode *right = nullptr;
     long long weight;
-    long long id;
+    size_t id;
+    /// Huffman code
     string code;
 
-    BinaryTreeNode(long long w, long long i, string c) : weight(w), id(i), code(std::move(c))
+    BinaryTreeNode(long long w, size_t i, string c) : weight(w), id(i), code(std::move(c))
     {
     }
 
@@ -38,7 +40,7 @@ struct BinaryTreeNode
         left = ln;
         right = rn;
         weight = ln->weight + rn->weight;
-        id = static_cast<long long>(-1);
+        id = static_cast<size_t>(-1);
     }
 };
 
@@ -146,15 +148,8 @@ public:
         }
 
         root = pq.top();
-        cout << root->weight << endl;
         vector<BinaryTreeNode *> point;
         createHuffmanCode(root, point);
-        long long length = static_cast<long long>(midNodeList.size());
-        for(long long i=0;i<length;i++)
-        {
-            midNodeList[i]->id = static_cast<long long>(i);
-        }
-
     }
 
     void createHuffmanCode(BinaryTreeNode *n, vector<BinaryTreeNode *> point)
@@ -244,15 +239,20 @@ public:
         return wordTable.end();
     }
 
-    unordered_map<long long, vector<double>> getMidNodeMatrix(long long size)
+    unordered_map<BinaryTreeNode*, vector<double>> getMidNodeMatrix(long long size)
     {
-        unordered_map<long long, vector<double>> mat;
+        unordered_map<BinaryTreeNode*, vector<double>> mat;
         for (auto node:midNodeList)
         {
-            mat.insert(make_pair((long long) node, vector<double>(static_cast<unsigned long>(size), 0)));
+            mat.insert(make_pair(node, vector<double>(static_cast<unsigned long>(size), 0)));
         }
         return mat;
     };
+
+    long long getWordCount()
+    {
+        return root->weight;
+    }
 
 };
 
@@ -274,9 +274,9 @@ public:
     const int EXP_TABLE_SIZE = 1000;
     const int MAX_EXP = 6;
 
-    unordered_map<long long, vector<double>> syn0; ///< Original vector table index by word huffman code
-    unordered_map<long long, vector<double>> syn1; ///< Parameter from hidden state to node
-    unordered_map<long long, vector<double>> syn1neg;
+    unordered_map<BinaryTreeNode*, vector<double>> syn0; ///< Original vector table index by word huffman code
+    unordered_map<BinaryTreeNode*, vector<double>> syn1; ///< Parameter from hidden state to node
+    unordered_map<BinaryTreeNode*, vector<double>> syn1neg;
 
     double alpha = 0.025, starting_alpha, sample = 1e-3;
 
@@ -292,8 +292,12 @@ public:
 public:
     explicit Word2Vec(const string &trainFileName) : trainFile(trainFileName), vocab(trainFileName)
     {
+    }
+    void init()
+    {
         vocab.learnFromTrainFile();
         vocab.createBinaryTree();
+        totalWordCount = vocab.getWordCount();
         ns = 1;
         for (int i = 0; i < EXP_TABLE_SIZE; i++)
         {
@@ -345,7 +349,7 @@ public:
         {
             vector<double> tmp(static_cast<unsigned long>(layer1Size));
             std::generate(tmp.begin(), tmp.end(), std::bind(dist, std::ref(defaultRandomEngine)));
-            syn0.insert(make_pair((long long) n.second.currentNode, tmp));
+            syn0.insert(make_pair(n.second.currentNode, tmp));
         }
         if (ns > 0)
         {
@@ -353,17 +357,15 @@ public:
             {
                 vector<double> tmp(static_cast<unsigned long>(layer1Size));
                 std::generate(tmp.begin(), tmp.end(), std::bind(dist, std::ref(defaultRandomEngine)));
-                syn1neg.insert(make_pair((long long) n.second.currentNode, tmp));
+                syn1neg.insert(make_pair(n.second.currentNode, tmp));
             }
         }
     }
 
-    const unordered_map<long long, vector<double>>::iterator getVector(const string &word)
+    const unordered_map<BinaryTreeNode*, vector<double>>::iterator getVector(const string &word)
     {
-        cout << "Find vector representation of " << word << endl;
         auto iter = vocab.wordTable.find(getWordHash(word));
-        cout << iter->second.word << endl;
-        return syn0.find((long long) iter->second.currentNode);
+        return syn0.find(iter->second.currentNode);
     }
 
     int getVocabSize()
@@ -391,6 +393,51 @@ public:
                wordCountActual / (double) (iterTimes * totalWordCount + 1) * 100,
                wordCountActual / ((double) (now - start + 1) / (double) CLOCKS_PER_SEC * 1000));
         fflush(stdout);
+    }
+
+    void saveResult()
+    {
+        ofstream outFile;
+        outFile.open("result", std::ofstream::out);
+        if (classes == 0)
+        {
+            for (auto it:vocab.wordTable)
+            {
+                outFile << it.second.word << " ";
+                auto index = it.second.currentNode;
+                for (int j = 0; j < layer1Size; j++)
+                {
+                    outFile << syn0[index][j] << " ";
+                }
+                outFile << endl;
+            }
+            outFile << endl;
+        }
+        outFile.close();
+    }
+
+    void loadResult()
+    {
+        std::ifstream inFile("result");
+        std::string   line;
+        int cnt = 0;
+        while(std::getline(inFile, line))
+        {
+            std::stringstream   linestream(line);
+            string word;
+
+           if(cnt%1000==0) cout<<cnt<<endl;
+            std::getline(linestream, word, ' ');  // read up-to the first tab (discard tab).
+            vocab.wordTable[getWordHash(word)].word = word;
+            vocab.wordTable[getWordHash(word)].currentNode = new BinaryTreeNode(0,0,"");
+            double num;
+            while(linestream>>num)
+            {
+                syn0[vocab.wordTable[getWordHash(word)].currentNode].push_back(num);
+            }
+            cnt++;
+        }
+        inFile.close();
     }
 
 };
@@ -430,12 +477,6 @@ void trainModelThread(Word2Vec &w2v, int threadId)
 
     while (true)
     {
-        if (w2v.debugMode > 1)
-        {
-            cout << "wordCount: " << wordCount << endl;
-            cout << "lastWordCount: " << lastWordCount << endl;
-        }
-
         if (wordCount - lastWordCount > 10000)
         {
             w2v.wordCountActual += wordCount - lastWordCount;
@@ -495,7 +536,7 @@ void trainModelThread(Word2Vec &w2v, int threadId)
                     if (lastWord == w2v.vocab.endIter())
                     { continue; }
                     /// Index of word in vector table
-                    auto index = (long long) lastWord->second.currentNode;
+                    auto index = lastWord->second.currentNode;
 
                     // Calculate sum of word vector in window
                     for (long long k = 0; k < w2v.layer1Size; k++)
@@ -541,7 +582,7 @@ void hierarchicalSoftmax(Word2Vec &w2v, const vector<double> &neu1, vector<doubl
     {
         /// Probability of each node
         double f = 0;
-        auto index = (long long) word->second.point[i];
+        auto index = word->second.point[i];
         for (int j = 0; j < w2v.layer1Size; j++)
         { f += w2v.syn1[index][j] * neu1[j]; }
         if (f <= -w2v.MAX_EXP or f >= w2v.MAX_EXP)
@@ -588,7 +629,7 @@ void negativeSampling(Word2Vec &w2v,
             label = 0;
         }
 
-        auto index = (long long) target->second.currentNode;
+        auto index = target->second.currentNode;
         double f = 0;
         for (int j = 0; j < w2v.layer1Size; j++)
         { f += neu1[j] * w2v.syn1neg[index][j]; }
@@ -626,7 +667,7 @@ void negativeSampling(Word2Vec &w2v,
             if (lastWord == w2v.vocab.endIter())
             { continue; }
 
-            auto l = (long long) lastWord->second.currentNode;
+            auto l = lastWord->second.currentNode;
 
             for (c = 0; c < w2v.layer1Size; c++)
             { w2v.syn0[l][c] += neu1e[c]; }
@@ -666,7 +707,7 @@ vector<double> getDifference(const vector<double> &v1, const vector<double> &v2)
 
 }
 
-double getDotProduct(const vector<double> &v1, const vector<double> &v2)
+double getCosSim(const vector<double> &v1, const vector<double> &v2)
 {
     assert(v1.size() == v2.size());
     double c = 0;
@@ -715,24 +756,7 @@ void trainModel(Word2Vec &w2v)
     }
 
     cout << "Train finished" << endl;
-
-    ofstream outFile;
-    outFile.open("result", std::ofstream::out);
-    if (w2v.classes == 0)
-    {
-        outFile << w2v.getVocabSize() << "\t" << w2v.layer1Size << endl;
-        for (auto it:w2v.vocab.wordTable)
-        {
-            outFile << it.second.word << "\t";
-            auto index = (long long) it.second.currentNode;
-            for (int j = 0; j < w2v.layer1Size; j++)
-            {
-                outFile << w2v.syn0[index][j] << " ";
-            }
-            outFile << endl;
-        }
-        outFile << endl;
-    }
+    w2v.saveResult();
 }
 void verifyResult(Word2Vec &w2v)
 {
@@ -741,33 +765,47 @@ void verifyResult(Word2Vec &w2v)
 
     auto diff1 = getDifference(w2v.getVector(stringList[0])->second, w2v.getVector(stringList[1])->second);
     auto diff2 = getDifference(w2v.getVector(stringList[2])->second, w2v.getVector(stringList[3])->second);
-    cout << "Product: " << getDotProduct(diff1, diff2) << endl;
+    cout << "Product: " << getCosSim(diff1, diff2) << endl;
 }
 
 void findSimiliarWord(Word2Vec &w2v, string word)
 {
-    for(const auto& candidate:w2v.syn0)
+    auto targetVec = w2v.getVector(word);
+    vector<pair<string, double>> result;
+    for(const auto& candidate:w2v.vocab.wordTable)
     {
+        auto vec = w2v.getVector(candidate.second.word);
+        auto score = getCosSim(targetVec->second, vec->second);
 
+        result.push_back(make_pair(candidate.second.word,score));
+    }
+    auto comp = [](const pair<string, double>& lhs, const pair<string, double>& rhs ) { return lhs.second > rhs.second; };
+    sort(result.begin(),result.end(),comp);
+    for(int i=0;i<10;i++)
+    {
+        cout<<result[i].first<<" "<<result[i].second<<endl;
     }
 }
 
 
 
-int main()
+int main(int argc,char* argv[])
 {
     Word2Vec word2Vec("test");
-    word2Vec.debugMode=0;
-    word2Vec.numThreads = 4;
+    if(argc==2) word2Vec.trainFile=argv[1];
+    word2Vec.debugMode=2;
+    word2Vec.numThreads = 1;
+    word2Vec.iterTimes = 5;
+    word2Vec.init();
+
+//    word2Vec.loadResult();
     trainModel(word2Vec);
-    verifyResult(word2Vec);
-//    const int EXP_TABLE_SIZE=1000;
-//    vector<double>expTable;
-//    const int MAX_EXP = 6;
-
-
-
-//    v.readVocab();
+    word2Vec.saveResult();
+//    verifyResult(word2Vec);
+    findSimiliarWord(word2Vec,"man");
+//    findSimiliarWord(word2Vec,"water");
+//    findSimiliarWord(word2Vec,"woman");
+//    findSimiliarWord(word2Vec,"apple");
     return 0;
 }
 
