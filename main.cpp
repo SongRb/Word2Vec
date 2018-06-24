@@ -792,20 +792,33 @@ void findSimiliarWord(Word2Vec &w2v, string word)
 int main(int argc,char* argv[])
 {
     Word2Vec word2Vec("test");
-    if(argc==2) word2Vec.trainFile=argv[1];
-    word2Vec.debugMode=2;
-    word2Vec.numThreads = 1;
-    word2Vec.iterTimes = 5;
+	word2Vec.trainFile = argv[1];
+	word2Vec.debugMode = 2;
+	word2Vec.numThreads = 2;
+	word2Vec.iterTimes = 10;
+    if(argc%2==0)
+    {
+        cout<<"Please input valid argument"<<endl;
+        return 0;
+    } else
+    {
+		int index = 1;
+		while (index < argc)
+		{
+			if (argv[index] == "-f") word2Vec.trainFile = argv[index + 1];
+			else if(argv[index] == "-m") word2Vec.debugMode = (int)argv[index + 1];
+			else if (argv[index] == "-t") word2Vec.numThreads = (int)argv[index + 1];
+			else if (argv[index] == "-i") word2Vec.iterTimes = (int)argv[index + 1];
+			else if (argv[index]=="-d")word2Vec.layer1Size = (int)argv[index + 1];
+			else if (argv[index] == "-hs")word2Vec.layer1Size = (int)argv[index + 1];
+			else if (argv[index] == "-ns")word2Vec.layer1Size = (int)argv[index + 1];
+			index += 2;
+		}
+    }
     word2Vec.init();
-
-//    word2Vec.loadResult();
     trainModel(word2Vec);
     word2Vec.saveResult();
-//    verifyResult(word2Vec);
     findSimiliarWord(word2Vec,"man");
-//    findSimiliarWord(word2Vec,"water");
-//    findSimiliarWord(word2Vec,"woman");
-//    findSimiliarWord(word2Vec,"apple");
     return 0;
 }
 
